@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Reply struct {
@@ -15,11 +17,17 @@ type Reply struct {
 }
 
 // githubInfo returns name and number of public repos for login
-func githubInfo(login string) (string, int, error) {
+func githubInfo(ctx context.Context, login string) (string, int, error) {
 	link := "https://api.github.com/users/" + url.PathEscape(login)
-	resp, err := http.Get(link)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	// resp, err := http.Get(link)
 	if err != nil {
 		return "", 0, fmt.Errorf("error: %s", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", 0, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -38,7 +46,9 @@ func githubInfo(login string) (string, int, error) {
 }
 
 func main() {
-	fmt.Println(githubInfo("shubhamchemate003"))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Millisecond)
+	defer cancel()
+	fmt.Println(githubInfo(ctx, "shubhamchemate003"))
 }
 
 func demo() {
