@@ -1,12 +1,17 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -66,8 +71,45 @@ func githubInfo(ctx context.Context, login string) (string, int, error) {
 	return r.Name, r.NumRepos, nil
 }
 
-func main() {
+func sha1Sum(fileName string) (string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return "", nil
+	}
+	defer file.Close()
 
+	var r io.Reader = file
+
+	if strings.HasSuffix(fileName, ".gz") {
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return "", err
+		}
+		defer gz.Close()
+		r = gz
+	}
+
+	w := sha1.New()
+	if _, err := io.Copy(w, r); err != nil {
+		return "", err
+	}
+
+	sig := w.Sum(nil)
+	return fmt.Sprintf("%x", sig), nil
+}
+
+func sha1_go() {
+	sig, err := sha1Sum("http.log.gz")
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
+	fmt.Println(sig)
+
+	sig, err = sha1Sum("revisit.go")
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
+	fmt.Println(sig)
 }
 
 func githubInfo_go() {
