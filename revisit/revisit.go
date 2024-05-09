@@ -330,6 +330,22 @@ func max[T Number](nums []T) T {
 	return max
 }
 
+func safeDiv(a, b int) (q int, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println("ERROR:", e)
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	return a / b, nil
+}
+
+func main() {
+	fmt.Println(safeDiv(1, 0))
+	fmt.Println(safeDiv(7, 2))
+}
+
 func empty_go() {
 	var i any
 	// var i interface{}
