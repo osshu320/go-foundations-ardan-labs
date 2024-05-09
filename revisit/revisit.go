@@ -283,6 +283,90 @@ var wordRe = regexp.MustCompile(`[a-zA-Z]`)
 // 	fmt.Println("Hello World (init)")
 // }
 
+func maxInts(nums []int) int {
+	if len(nums) == 0 {
+		return 0
+	}
+
+	max := nums[0]
+	for _, n := range nums[1:] {
+		if n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+func maxFloat64s(nums []float64) float64 {
+	if len(nums) == 0 {
+		return 0
+	}
+
+	max := nums[0]
+	for _, n := range nums[1:] {
+		if n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+type Number interface {
+	int | float64
+}
+
+// func max[T int | float64](nums []T) T {
+func max[T Number](nums []T) T {
+	if len(nums) == 0 {
+		return 0
+	}
+
+	max := nums[0]
+	for _, n := range nums[1:] {
+		if n > max {
+			max = n
+		}
+	}
+	return max
+}
+
+func empty_go() {
+	var i any
+	// var i interface{}
+
+	i = 7
+	fmt.Println(i)
+
+	i = "hi"
+	fmt.Println(i)
+
+	// Rule of Thumb: Don't use any
+
+	s := i.(string)
+	fmt.Println(s)
+
+	n, ok := i.(int)
+	if ok {
+		fmt.Println(n)
+	} else {
+		fmt.Println("not an int")
+	}
+
+	switch i.(type) {
+	case int:
+		fmt.Println("int")
+	case string:
+		fmt.Println("string")
+	default:
+		fmt.Printf("unknown type %T\n", i)
+	}
+
+	// fmt.Println(maxInts([]int{1, 2, 3}))
+	// fmt.Println(maxFloat64s([]float64{3, 2, 1}))
+	fmt.Println(max([]float64{3, 2, 1}))
+	fmt.Println(max([]int{3, 2, 1}))
+}
+
 func freq_go() {
 	var stocks map[string]float64
 	sym := "TTWO"
