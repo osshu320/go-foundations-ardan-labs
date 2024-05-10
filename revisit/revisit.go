@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha1"
@@ -190,6 +191,26 @@ type Player struct {
 	Keys []Key
 }
 
+func getDist(p Player, x, y int) int {
+	dx := p.X - x
+	dy := p.Y - y
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	return dx + dy
+}
+
+func sortByDistance(players []Player, x, y int) {
+	slices.SortFunc(players, func(p, q Player) int {
+		d1 := getDist(p, x, y)
+		d2 := getDist(q, x, y)
+		return cmp.Compare(d1, d2)
+	})
+}
+
 func (p *Player) FoundKey(k Key) error {
 	if k < Jade || k >= invalidKey {
 		return fmt.Errorf("invalid key: %#v", k)
@@ -276,7 +297,7 @@ func wordFrequency(r io.Reader) (map[string]int, error) {
 	return freqs, nil
 }
 
-var wordRe = regexp.MustCompile(`[a-zA-Z]`)
+var wordRe = regexp.MustCompile(`[a-zA-Z]+`)
 
 // Runs Before main
 // func init() {
@@ -341,7 +362,80 @@ func safeDiv(a, b int) (q int, err error) {
 	return a / b, nil
 }
 
+func mostCommonN(r io.Reader, N int) error {
+	freqs, err := wordFrequency(r)
+	if err != nil {
+		return err
+	}
+
+	type wf struct {
+		word string
+		freq int
+	}
+
+	var fs []wf
+	for k, v := range freqs {
+		fs = append(fs, wf{word: k, freq: v})
+	}
+
+	slices.SortFunc(fs, func(wf1, wf2 wf) int {
+		if n := cmp.Compare(wf1.freq, wf2.freq); n != 0 {
+			if n == -1 {
+				return 1
+			} else {
+				return -1
+			}
+		}
+
+		return cmp.Compare(wf1.word, wf2.word)
+	})
+
+	for i := 0; i < N; i++ {
+		fmt.Println(fs[i])
+	}
+
+	return nil
+}
+
 func main() {
+
+}
+
+func mostCommonN_demo() {
+	file, err := os.Open("sherlock.txt")
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
+	defer file.Close()
+
+	mostCommonN(file, 10)
+
+	// w, err := mostCommon(file)
+	// if err != nil {
+	// 	log.Fatalf("error: %s", err)
+	// }
+	// fmt.Println(w)
+}
+
+func sortByDistance_demo() {
+	p1 := Player{
+		Name: "Parzival",
+		Item: Item{500, 300},
+	}
+	p2 := Player{
+		Name: "Parzival",
+		Item: Item{400, 300},
+	}
+	p3 := Player{
+		Name: "Parzival",
+		Item: Item{100, 100},
+	}
+	players := []Player{p1, p2, p3}
+	sortByDistance(players, 0, 0)
+	fmt.Println(players)
+}
+
+func div_go() {
 	fmt.Println(safeDiv(1, 0))
 	fmt.Println(safeDiv(7, 2))
 }
