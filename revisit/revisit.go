@@ -398,7 +398,7 @@ func mostCommonN(r io.Reader, N int) error {
 }
 
 func main() {
-
+	slices_go_main()
 }
 
 func mostCommonN_demo() {
