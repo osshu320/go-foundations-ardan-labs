@@ -398,7 +398,8 @@ func mostCommonN(r io.Reader, N int) error {
 }
 
 func main() {
-	slices_go_main()
+	// slices_go_main()
+	interfaces_go_main()
 }
 
 func mostCommonN_demo() {
