@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"cmp"
+	"compress/bzip2"
 	"compress/gzip"
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +19,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -397,7 +401,332 @@ func mostCommonN(r io.Reader, N int) error {
 	return nil
 }
 
+func sleepSort(a []int) []int {
+	ch := make(chan int)
+	for _, x := range a {
+		x := x
+		go func() {
+			time.Sleep(time.Duration(x) * time.Millisecond)
+			ch <- x
+		}()
+	}
+
+	var b []int
+	for range a {
+		x := <-ch
+		b = append(b, x)
+	}
+	close(ch)
+	return b
+}
+
+func fileSig(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	_, err = io.Copy(hash, bzip2.NewReader(file))
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+func parseSigFile(r io.Reader) (map[string]string, error) {
+	sigs := make(map[string]string)
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 2 {
+			return nil, fmt.Errorf("bad line: %q", scanner.Text())
+		}
+		sigs[fields[1]] = fields[0]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return sigs, nil
+}
+
+type result struct {
+	fileName string
+	err      error
+	match    bool
+}
+
+func sigWorker(fName, sigRef string, ch chan<- result) {
+	r := result{fileName: fName}
+	sig, err := fileSig(fName)
+	if err != nil {
+		r.err = err
+	} else {
+		r.match = sig == sigRef
+	}
+	ch <- r
+}
+
+func siteTime(url string) {
+	start := time.Now()
+
+	res, err := http.Get(url)
+	if err != nil {
+		log.Printf("ERROR: %s -> %s", url, err)
+		return
+	}
+	defer res.Body.Close()
+
+	if _, err := io.Copy(io.Discard, res.Body); err != nil {
+		log.Printf("ERROR: %s -> %s", url, err)
+	}
+
+	dur := time.Since(start)
+	log.Printf("INFO: %s -> %v", url, dur)
+}
+
+type Payment struct {
+	From   string
+	To     string
+	Amount float64
+	once   sync.Once
+}
+
+func (p *Payment) Process() {
+	t := time.Now()
+	p.once.Do(func() { p.process(t) })
+}
+
+func (p *Payment) process(t time.Time) {
+	ts := t.Format(time.RFC3339)
+	fmt.Printf("[%s] %s -> $%.2f -> %s\n", ts, p.From, p.Amount, p.To)
+}
+
+type Bid struct {
+	AdURL string
+	Price int
+}
+
+var defaultBid = Bid{
+	AdURL: "http://adsЯus.com/default",
+	Price: 3,
+}
+
+func bestBid(url string) Bid {
+	d := 100 * time.Millisecond
+	if strings.HasPrefix(url, "https://") {
+		d = 20 * time.Millisecond
+	}
+	time.Sleep(d)
+
+	return Bid{
+		AdURL: "http://adsЯus.com/default",
+		Price: 7,
+	}
+}
+
+func bidOn(ctx context.Context, url string) Bid {
+	ch := make(chan Bid, 1)
+	go func() {
+		ch <- bestBid(url)
+	}()
+
+	select {
+	case bid := <-ch:
+		return bid
+	case <-ctx.Done():
+		return defaultBid
+	}
+}
+
 func main() {
+
+}
+
+func rtb_go() {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	url := "https://go.dev"
+	bid := bidOn(ctx, url)
+	fmt.Println(bid)
+}
+
+func select_go() {
+	ch1, ch2 := make(chan int), make(chan int)
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		ch1 <- 1
+	}()
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		ch2 <- 2
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	select {
+	case val := <-ch1:
+		fmt.Println("ch1:", val)
+	case val := <-ch2:
+		fmt.Println("ch2:", val)
+	case <-ctx.Done():
+		fmt.Println("timeout")
+	}
+
+	// select {}
+}
+
+func counter_go() {
+	// var mu sync.Mutex
+	// count := 0
+	var count int64
+	const n = 10
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+
+			for j := 0; j < 10_000; j++ {
+				/*
+					mu.Lock()
+					count++
+					mu.Unlock()
+				*/
+				atomic.AddInt64(&count, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+	fmt.Println(count)
+}
+
+func payment_go() {
+	p := Payment{
+		From:   "Wile. E. Coyote",
+		To:     "ACME",
+		Amount: 123.34,
+	}
+	p.Process()
+	p.Process()
+}
+
+func siteTime_go() {
+	urls := []string{
+		"https://google.com",
+		"https://apple.com",
+		"https://no-such-site.biz",
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(urls))
+	for _, url := range urls {
+		url := url
+		go func() {
+			defer wg.Done()
+			siteTime(url)
+		}()
+	}
+
+	wg.Wait()
+}
+
+func taxi_go() {
+	rootDir := "./taxi-sha256"
+	file, err := os.Open(rootDir + "/sha256sum.txt")
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
+	defer file.Close()
+
+	sigs, err := parseSigFile(file)
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
+
+	start := time.Now()
+	ok := true
+
+	ch := make(chan result)
+	for name, sig := range sigs {
+		fname := rootDir + "/" + name + ".bz2"
+		go sigWorker(fname, sig, ch)
+	}
+
+	for range sigs {
+		r := <-ch
+		if r.err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s - %s\n", r.fileName, err)
+			ok = false
+			continue
+		}
+
+		if !r.match {
+			ok = false
+			fmt.Printf("error: %s mismatch\n", r.fileName)
+		}
+	}
+
+	dur := time.Since(start)
+	fmt.Printf("Processed %d files in %v\n", len(sigs), dur)
+	if !ok {
+		os.Exit(1)
+	}
+}
+
+func go_chan_go() {
+	// go fmt.Println("goroutine")
+	// fmt.Println("main")
+
+	// for i := 0; i < 3; i++ {
+	// 	i := i
+	// 	go func() {
+	// 		fmt.Println(i)
+	// 	}()
+	// }
+
+	// time.Sleep(10 * time.Millisecond)
+
+	ch := make(chan string)
+	go func() {
+		ch <- "hi"
+	}()
+	msg := <-ch
+	log.Println(msg)
+
+	go func() {
+		for i := 0; i < 3; i++ {
+			msg := fmt.Sprintf("message #%d", i+1)
+			ch <- msg
+		}
+		close(ch)
+	}()
+
+	for msg := range ch {
+		log.Println("got:", msg)
+	}
+	msg = <-ch
+	log.Printf("closed: %#v\n", msg)
+
+	msg, ok := <-ch
+	log.Printf("closed: %#v (ok=%v)\n", msg, ok)
+
+	values := []int{15, 8, 42, 16, 4, 23}
+	fmt.Println(sleepSort(values))
+}
+
+func examples() {
 	slices_go_main()
 	// interfaces_go_main()
 	// defer_go_main()
