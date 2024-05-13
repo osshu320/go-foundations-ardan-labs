@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -543,10 +544,6 @@ func bidOn(ctx context.Context, url string) Bid {
 	}
 }
 
-func main() {
-
-}
-
 func rtb_go() {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -642,7 +639,43 @@ func siteTime_go() {
 	wg.Wait()
 }
 
-func taxi_go() {
+func ff() {
+	LIMIT := 10
+	limCh := make(chan struct{}, LIMIT)
+
+	for i := 0; i < 100; i++ {
+		limCh <- struct{}{}
+		go func(i int) {
+			log.Println(i)
+			time.Sleep(1 * time.Second)
+			<-limCh
+		}(i)
+	}
+}
+
+func calcSig(sigs map[string]string, rootDir string, ch chan result, signalCh chan bool) {
+	LIMIT := 5
+	limCh := make(chan struct{}, LIMIT)
+
+	for name, sig := range sigs {
+		select {
+		case <-signalCh:
+			log.Println("Received Quit Signal (calcSig)")
+			return
+		default:
+			fname := rootDir + "/" + name + ".bz2"
+
+			limCh <- struct{}{}
+			sig := sig
+			go func() {
+				sigWorker(fname, sig, ch)
+				<-limCh
+			}()
+		}
+	}
+}
+
+func main() {
 	rootDir := "./taxi-sha256"
 	file, err := os.Open(rootDir + "/sha256sum.txt")
 	if err != nil {
@@ -659,10 +692,9 @@ func taxi_go() {
 	ok := true
 
 	ch := make(chan result)
-	for name, sig := range sigs {
-		fname := rootDir + "/" + name + ".bz2"
-		go sigWorker(fname, sig, ch)
-	}
+	signalCh := make(chan bool)
+
+	go calcSig(sigs, rootDir, ch, signalCh)
 
 	for range sigs {
 		r := <-ch
@@ -674,12 +706,17 @@ func taxi_go() {
 
 		if !r.match {
 			ok = false
-			fmt.Printf("error: %s mismatch\n", r.fileName)
+			log.Printf("error: %s mismatch\n", r.fileName)
+			log.Println("Goroutine Count:", runtime.NumGoroutine())
+			signalCh <- true
+		} else {
+			log.Printf("matched: %s\n", r.fileName)
 		}
 	}
 
 	dur := time.Since(start)
-	fmt.Printf("Processed %d files in %v\n", len(sigs), dur)
+	log.Println("Goroutine Count:", runtime.NumGoroutine())
+	log.Printf("Processed %d files in %v\n", len(sigs), dur)
 	if !ok {
 		os.Exit(1)
 	}
