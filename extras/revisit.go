@@ -675,7 +675,22 @@ func calcSig(sigs map[string]string, rootDir string, ch chan result, signalCh ch
 	}
 }
 
-func main() {
+func race_detector() {
+	c := make(chan bool)
+	m := make(map[string]string)
+	go func() {
+		m["1"] = "a"
+		c <- true
+	}()
+
+	m["2"] = "b"
+	<-c
+	for k, v := range m {
+		log.Println(k, v)
+	}
+}
+
+func exercise_day03() {
 	rootDir := "./taxi-sha256"
 	file, err := os.Open(rootDir + "/sha256sum.txt")
 	if err != nil {
