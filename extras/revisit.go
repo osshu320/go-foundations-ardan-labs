@@ -675,6 +675,21 @@ func calcSig(sigs map[string]string, rootDir string, ch chan result, signalCh ch
 	}
 }
 
+func fn() {
+	log.Println("In fn")
+	go func() {
+		log.Println("In gn()")
+		time.Sleep(5 * time.Second)
+		log.Println("Returning from gn()")
+	}()
+}
+
+func main() {
+	fn()
+	log.Println("In Main")
+	time.Sleep(15 * time.Second)
+}
+
 func race_detector() {
 	c := make(chan bool)
 	m := make(map[string]string)
