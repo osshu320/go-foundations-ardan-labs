@@ -675,6 +675,10 @@ func calcSig(sigs map[string]string, rootDir string, ch chan result, signalCh ch
 	}
 }
 
+func main() {
+	pipelines_main()
+}
+
 func fn() {
 	log.Println("In fn")
 	go func() {
@@ -684,7 +688,7 @@ func fn() {
 	}()
 }
 
-func main() {
+func goroutine_test() {
 	fn()
 	log.Println("In Main")
 	time.Sleep(15 * time.Second)
